@@ -1,0 +1,35 @@
+name: 🤖 Issue Chat Bot
+
+on:
+  issue_comment:
+    types: [created] # Sadece yeni yorum yapıldığında çalışır
+
+permissions:
+  issues: write # Issue'ya yorum yazabilmesi için gerekli yetki
+  contents: read
+
+jobs:
+  reply-to-comment:
+    # Eğer yorumu bot yapmadıysa bu action çalışsın
+    if: ${{ !github.event.issue.pull_request && github.event.comment.user.login != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Repoyu Klonla
+        uses: actions/checkout@v4
+
+      - name: 🦀 Rust Kurulumu
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: 🤖 Chat Cevabı Üret
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          USER_COMMENT: ${{ github.event.comment.body }}
+          COMMENTER: ${{ github.event.comment.user.login }}
+        run: cargo run --release --bin chat
+
+      - name: ✍️ Yorum Olarak Gönder
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue comment ${{ github.event.issue.number }} --body-file chat_reply.md

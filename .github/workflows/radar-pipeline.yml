@@ -23,7 +23,7 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
-        run: cargo run --release
+        run: cargo run --release --bin radar
 
       - name: 📝 Günü Tarihle
         id: date
