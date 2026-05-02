@@ -7,13 +7,11 @@ use tokio::fs;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("📡 Radar uyandı. Haberler toplanıyor...");
 
-    // 1. Repo Sahibinin Adını Dinamik Al
     let repo_owner = env::var("GITHUB_REPOSITORY_OWNER").unwrap_or_else(|_| "Geliştirici".to_string());
     println!("👤 Hedef Kullanıcı/Organizasyon: {}", repo_owner);
 
     let client = Client::new();
 
-    // 2. Hacker News'ten En Popüler Haberleri Çek
     let hn_url = "https://hacker-news.firebaseio.com/v0/topstories.json";
     let story_ids: Vec<u64> = client.get(hn_url).send().await?.json().await?;
 
@@ -26,19 +24,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    println!("🧠 Gemini API'ye bağlanılıyor...");
+    println!("🧠 Gemini 2.5 Flash API'ye bağlanılıyor...");
     let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY bulunamadı!");
+    
+    // MODEL ADINI 2.5 OLARAK GÜNCELLEDİK!
     let gemini_url = format!(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={}",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={}",
         api_key
     );
 
-    // 3. Dışarıdaki Prompt dosyasını oku
     let prompt_template = fs::read_to_string("system_prompt.txt")
         .await
         .unwrap_or_else(|_| "Haberleri özetle.".to_string());
 
-    // 4. Prompt'u repo sahibiyle birleştir
     let final_prompt = format!(
         "{}\n\nLütfen bu analizi organizasyon/kullanıcı olan '{}' için özelleştir.\n\nİşte Haberler:\n{}",
         prompt_template, repo_owner, news_titles
@@ -52,12 +50,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let response = client.post(&gemini_url).json(&payload).send().await?;
     let status = response.status();
-    let response_text = response.text().await?; // Hata olursa diye metni okuyoruz
+    let response_text = response.text().await?; 
 
-    // 5. Hata Kontrolü!
     if !status.is_success() {
         eprintln!("❌ Gemini API Hatası: {}", response_text);
-        std::process::exit(1); // Action'ı burada durdurur
+        std::process::exit(1); 
     }
 
     let response_json: serde_json::Value = serde_json::from_str(&response_text)?;
