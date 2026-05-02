@@ -22,6 +22,7 @@ jobs:
       - name: 🚀 Radarı Çalıştır (Build & Run)
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: cargo run --release
 
       - name: 📝 Günü Tarihle
