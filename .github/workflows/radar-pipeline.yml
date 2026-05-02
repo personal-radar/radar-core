@@ -1,0 +1,38 @@
+name: 📡 Daily Intelligence Radar
+
+on:
+  schedule:
+    - cron: '0 4 * * *' # UTC saatine göre 04:00 (Türkiye saatiyle ~07:00'de çalışır)
+  workflow_dispatch: # Bu satır sayesinde Github arayüzünden manuel tetikleyebiliriz!
+
+permissions:
+  issues: write # Issue açabilmesi için bot yetkisi
+  contents: read
+
+jobs:
+  harvest-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Repoyu Klonla
+        uses: actions/checkout@v4
+
+      - name: 🦀 Rust Kurulumu
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: 🚀 Radarı Çalıştır (Build & Run)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: cargo run --release
+
+      - name: 📝 Günü Tarihle
+        id: date
+        run: echo "TODAY=$(date +'%d %B %Y')" >> $GITHUB_ENV
+
+      - name: 📭 Issue Olarak Yayınla
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --title "📅 Radar Bülteni: $TODAY" \
+            --body-file daily_radar.md \
+            --label "daily-digest,automated"
