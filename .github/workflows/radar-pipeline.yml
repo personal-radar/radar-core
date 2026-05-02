@@ -1,13 +1,15 @@
-name: 📡 Daily Intelligence Radar
+name: 📡 Daily Intelligence Radar & Web Publish
 
 on:
   schedule:
-    - cron: '0 4 * * *' # UTC saatine göre 04:00 (Türkiye saatiyle ~07:00'de çalışır)
-  workflow_dispatch: # Bu satır sayesinde Github arayüzünden manuel tetikleyebiliriz!
+    - cron: '0 4 * * *'
+  workflow_dispatch:
 
 permissions:
-  issues: write # Issue açabilmesi için bot yetkisi
-  contents: read
+  issues: write
+  contents: write
+  pages: write      # GitHub Pages için yetki
+  id-token: write   # OIDC doğrulaması için
 
 jobs:
   harvest-and-publish:
@@ -19,12 +21,14 @@ jobs:
       - name: 🦀 Rust Kurulumu
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
-      - name: 🚀 Radarı Çalıştır (Build & Run)
+      # 1. Aşama: Veriyi Çek ve Sentezle
+      - name: 🚀 Radarı Çalıştır (Veri Hasadı)
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: cargo run --release --bin radar
 
+      # 2. Aşama: Günü Tarihle ve Issue Aç
       - name: 📝 Günü Tarihle
         id: date
         run: echo "TODAY=$(date +'%d %B %Y')" >> $GITHUB_ENV
@@ -36,3 +40,25 @@ jobs:
           gh issue create \
             --title "📅 Radar Bülteni: $TODAY" \
             --body-file daily_radar.md
+
+      # 3. Aşama: Web Sitesini Oluştur
+      - name: 🌐 Web Sitesini Üret
+        run: cargo run --release --bin web_builder
+
+      # 4. Aşama: GitHub Pages'e Yükle
+      - name: 📤 GitHub Pages Upload
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public/
+
+  # 5. Aşama: GitHub Pages Deployment Job
+  deploy-pages:
+    needs: harvest-and-publish
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 🚀 Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
