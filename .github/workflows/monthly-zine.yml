@@ -1,0 +1,69 @@
+name: 📖 Monthly Macro-Trend Zine
+
+on:
+  schedule:
+    - cron: '0 5 1 * *' # Her ayın 1'inde saat 05:00'te çalışır
+  workflow_dispatch: # İstediğin zaman manuel tetikleyebilmen için
+
+permissions:
+  issues: write
+  contents: write
+
+jobs:
+  create-zine:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Repoyu Klonla
+        uses: actions/checkout@v4
+
+      - name: 📝 Dergi Kapağını Hazırla
+        run: |
+          echo "# 📖 Aylık Sentez: $(date +'%B %Y')" > monthly_zine.md
+          echo "Bu dosya, geçtiğimiz 30 günün en kritik keşiflerini ve bu keşiflerin insanlık, yazılım mimarisi ve uzay üzerindeki etkilerini özetler." >> monthly_zine.md
+          echo "---" >> monthly_zine.md
+
+      # NOT: Gerçek bir aylık arşivleme için, günlük .md dosyalarını bir 'archive' klasöründe biriktirmemiz gerekir.
+      # Şimdilik Gemini'ye genel bir aylık değerlendirme yapmasını söyleyen basit bir Python scripti kullanacağız (Rust'ı yormamak için).
+      
+      - name: 🧠 Kurulum (Python)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          
+      - name: 🧠 Gemini ile Aylık Sentez Üret
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          pip install google-generativeai
+          python -c "
+          import google.generativeai as genai
+          import os
+
+          genai.configure(api_key=os.environ['GEMINI_API_KEY'])
+          model = genai.GenerativeModel('gemini-2.5-flash')
+
+          prompt = f'''
+          Sen {os.environ['OWNER']} için çalışan bir Fütürist Baş Editörsün.
+          Lütfen geride bıraktığımız ay boyunca teknoloji, uzay, yapay zeka ve biyoloji dünyasında yaşanan en büyük KIRILMALARI düşün.
+          Bana bu ayın ruhunu anlatan, disiplinlerarası devasa bir 'Makro-Trend Raporu' yaz.
+          Şu başlıkları içersin:
+          1. Ayın Ruh Hali (Genel fütüristik bakış)
+          2. En Büyük 3 Paradigma Değişimi (Neler kalıcı olarak değişti?)
+          3. Noktaları Birleştirmek (Biyoloji, Uzay ve AI nasıl iç içe geçti?)
+          4. {os.environ['OWNER']} İçin Mimari Vizyon (Bu trendler ışığında önümüzdeki 5 yıl ne yapmalı?)
+          Markdown formatında, çok şık bir makale yaz.
+          '''
+          
+          response = model.generate_content(prompt)
+          with open('monthly_zine.md', 'a') as f:
+              f.write('\n\n' + response.text)
+          "
+
+      - name: 📭 Issue Olarak Yayınla
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --title "📖 Aylık Makro-Trend Dergisi: $(date +'%B %Y')" \
+            --body-file monthly_zine.md
